@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { ActionIcon, TextInput, ScrollArea, Loader } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
-import { IconSearch, IconFileDescription } from "@tabler/icons-react";
+import { IconSearch } from "@tabler/icons-react";
 import { useTranslation } from "react-i18next";
 import { useGetSpacesQuery } from "@/features/space/queries/space-query";
 import { useSearchSuggestionsQuery } from "@/features/search/queries/search-query";
@@ -10,6 +10,7 @@ import { IPage } from "@/features/page/types/page.types";
 import { DestinationSelection } from "./destination-picker.types";
 import { SpaceRow } from "./space-row";
 import classes from "./destination-picker.module.css";
+import { PageIcon } from "@/components/common/page-icon.tsx";
 
 type DestinationPickerProps = {
   onSelectionChange: (selection: DestinationSelection | null) => void;
@@ -52,16 +53,15 @@ export function DestinationPicker({
     const items = spacesData?.items ?? [];
     if (!searchSpacesOnly || !debouncedQuery) return items;
     const fold = (s: string) =>
-      s
-        .normalize("NFD")
-        .replace(/[̀-ͯ]/g, "")
-        .toLocaleLowerCase();
+      s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLocaleLowerCase();
     const term = fold(debouncedQuery);
     return items.filter((s) => fold(s.name).includes(term));
   }, [spacesData, searchSpacesOnly, debouncedQuery]);
 
   const selectedId =
-    selection?.type === "space" ? selection.spaceId : selection?.pageId ?? null;
+    selection?.type === "space"
+      ? selection.spaceId
+      : (selection?.pageId ?? null);
 
   const updateSelection = useCallback(
     (next: DestinationSelection | null) => {
@@ -170,26 +170,13 @@ export function DestinationPicker({
                     }}
                   >
                     <div className={classes.iconWrapper}>
-                      {page.icon ? (
-                        page.icon
-                      ) : (
-                        <ActionIcon
-                          component="div"
-                          variant="transparent"
-                          c="gray"
-                          size={22}
-                        >
-                          <IconFileDescription size={18} />
-                        </ActionIcon>
-                      )}
+                      <PageIcon icon={page.icon} isBase={page.isBase} />
                     </div>
                     <div className={classes.pageTitle}>
                       {page.title || t("Untitled")}
                     </div>
                     {page.space && (
-                      <div className={classes.spaceName}>
-                        {page.space.name}
-                      </div>
+                      <div className={classes.spaceName}>{page.space.name}</div>
                     )}
                   </div>
                 ),

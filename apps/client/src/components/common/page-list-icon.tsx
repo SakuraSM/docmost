@@ -1,5 +1,4 @@
-import { ThemeIcon } from "@mantine/core";
-import { IconFileDescription, IconTable } from "@tabler/icons-react";
+import { PageIcon } from "@/components/common/page-icon";
 
 type Props = {
   icon?: string | null;
@@ -7,12 +6,5 @@ type Props = {
 };
 
 export function PageListIcon({ icon, isBase }: Props) {
-  if (icon) {
-    return <>{icon}</>;
-  }
-  return (
-    <ThemeIcon variant="transparent" color="gray" size={18}>
-      {isBase ? <IconTable size={18} /> : <IconFileDescription size={18} />}
-    </ThemeIcon>
-  );
+  return <PageIcon icon={icon} isBase={isBase} />;
 }

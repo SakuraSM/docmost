@@ -55,6 +55,12 @@ import { markdownToHtml } from '@docmost/editor-ext';
 import { WatcherService } from '../../watcher/watcher.service';
 import { sql } from 'kysely';
 import { TransclusionService } from '../transclusion/transclusion.service';
+import {
+  buildPageIconValue,
+  PAGE_ICON_PREFIX,
+  parsePageIconAttachmentId,
+} from '../../attachment/page-icon.utils';
+import { AttachmentType } from '../../attachment/attachment.constants';
 
 @Injectable()
 export class PageService {
@@ -129,24 +135,27 @@ export class PageService {
       ydoc = createYdocFromJson(prosemirrorJson);
     }
 
-    const page = await this.pageRepo.insertPage({
-      slugId: generateSlugId(),
-      title: createPageDto.title,
-      position: await this.nextPagePosition(
-        createPageDto.spaceId,
-        parentPageId,
-      ),
-      icon: createPageDto.icon,
-      parentPageId: parentPageId,
-      spaceId: createPageDto.spaceId,
-      creatorId: userId,
-      workspaceId: workspaceId,
-      lastUpdatedById: userId,
-      isBase,
-      content,
-      textContent,
-      ydoc,
-    }, trx);
+    const page = await this.pageRepo.insertPage(
+      {
+        slugId: generateSlugId(),
+        title: createPageDto.title,
+        position: await this.nextPagePosition(
+          createPageDto.spaceId,
+          parentPageId,
+        ),
+        icon: createPageDto.icon,
+        parentPageId: parentPageId,
+        spaceId: createPageDto.spaceId,
+        creatorId: userId,
+        workspaceId: workspaceId,
+        lastUpdatedById: userId,
+        isBase,
+        content,
+        textContent,
+        ydoc,
+      },
+      trx,
+    );
 
     if (trx) {
       // Add the watcher inside the caller's transaction so the async worker
@@ -220,6 +229,13 @@ export class PageService {
     updatePageDto: UpdatePageDto,
     user: User,
   ): Promise<Page> {
+    if (updatePageDto.icon?.startsWith(PAGE_ICON_PREFIX)) {
+      throw new BadRequestException(
+        'Upload page images through the page icon endpoint',
+      );
+    }
+
+    const previousPageIconId = parsePageIconAttachmentId(page.icon);
     const contributors = new Set<string>(page.contributorIds);
     contributors.add(user.id);
     const contributorIds = Array.from(contributors);
@@ -234,6 +250,24 @@ export class PageService {
       },
       page.id,
     );
+
+    if (
+      previousPageIconId &&
+      updatePageDto.icon !== undefined &&
+      updatePageDto.icon !== page.icon
+    ) {
+      try {
+        await this.attachmentQueue.add(
+          QueueJob.DELETE_UNUSED_PAGE_ICON,
+          { attachmentId: previousPageIconId },
+          { jobId: `delete-unused-page-icon-${previousPageIconId}` },
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Failed to queue old page icon cleanup: ${previousPageIconId}`,
+        );
+      }
+    }
 
     this.generalQueue
       .add(QueueJob.ADD_PAGE_WATCHERS, {
@@ -563,6 +597,7 @@ export class PageService {
     }
 
     const attachmentMap = new Map<string, ICopyPageAttachment>();
+    const pageIconAttachmentIds = new Set<string>();
 
     const insertablePages: InsertablePage[] = await Promise.all(
       pages.map(async (page) => {
@@ -571,6 +606,19 @@ export class PageService {
 
         const doc = jsonToNode(pageContent);
         const prosemirrorDoc = removeMarkTypeFromDoc(doc, 'comment');
+        let copiedIcon = page.icon;
+        const pageIconAttachmentId = parsePageIconAttachmentId(page.icon);
+        if (pageIconAttachmentId) {
+          pageIconAttachmentIds.add(pageIconAttachmentId);
+          const newPageIconAttachmentId = uuid7();
+          attachmentMap.set(pageIconAttachmentId, {
+            newPageId: pageFromMap.newPageId,
+            oldPageId: page.id,
+            oldAttachmentId: pageIconAttachmentId,
+            newAttachmentId: newPageIconAttachmentId,
+          });
+          copiedIcon = buildPageIconValue(newPageIconAttachmentId);
+        }
 
         const attachmentIds = getAttachmentIds(prosemirrorDoc.toJSON());
 
@@ -676,7 +724,7 @@ export class PageService {
           id: pageFromMap.newPageId,
           slugId: pageFromMap.newSlugId,
           title: title,
-          icon: page.icon,
+          icon: copiedIcon,
           content: prosemirrorJson,
           textContent: jsonToText(prosemirrorJson),
           ydoc: createYdocFromJson(prosemirrorJson),
@@ -747,6 +795,7 @@ export class PageService {
         .where('id', 'in', attachmentsIds)
         .where('workspaceId', '=', rootPage.workspaceId)
         .execute();
+      const copiedPageIconIds = new Set<string>();
 
       for (const attachment of attachments) {
         try {
@@ -775,7 +824,13 @@ export class PageService {
                 id: newAttachmentId,
                 type: attachment.type,
                 filePath: newPathFile,
-                fileName: attachment.fileName,
+                fileName:
+                  attachment.type === AttachmentType.PageIcon
+                    ? attachment.fileName.replace(
+                        attachment.id,
+                        newAttachmentId,
+                      )
+                    : attachment.fileName,
                 fileSize: attachment.fileSize,
                 mimeType: attachment.mimeType,
                 fileExt: attachment.fileExt,
@@ -785,15 +840,32 @@ export class PageService {
                 spaceId: spaceId,
               })
               .execute();
+            if (attachment.type === AttachmentType.PageIcon) {
+              copiedPageIconIds.add(attachment.id);
+            }
           } catch (err) {
             this.logger.error(
               `Duplicate page: failed to copy attachment ${attachment.id}`,
               err,
             );
+            if (attachment.type === AttachmentType.PageIcon) {
+              await this.pageRepo.updatePage({ icon: null }, newPageId);
+            }
             // Continue with other attachments even if one fails
           }
         } catch (err) {
           this.logger.error(err);
+        }
+      }
+
+      for (const attachmentId of pageIconAttachmentIds) {
+        if (copiedPageIconIds.has(attachmentId)) continue;
+        const pageAttachment = attachmentMap.get(attachmentId);
+        if (pageAttachment) {
+          await this.pageRepo.updatePage(
+            { icon: null },
+            pageAttachment.newPageId,
+          );
         }
       }
     }

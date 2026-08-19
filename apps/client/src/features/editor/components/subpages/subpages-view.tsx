@@ -13,6 +13,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { sortPositionKeys } from "@/features/page/tree/utils/utils";
 import { useSharedPageSubpages } from "@/features/share/hooks/use-shared-page-subpages";
+import { PageIcon } from "@/components/common/page-icon.tsx";
 
 export default function SubpagesView(props: NodeViewProps) {
   const { editor } = props;
@@ -37,6 +38,7 @@ export default function SubpagesView(props: NodeViewProps) {
         slugId: node.slugId,
         title: node.name,
         icon: node.icon,
+        iconUrl: node.iconUrl,
         position: node.position,
       }));
     }
@@ -95,19 +97,9 @@ export default function SubpagesView(props: NodeViewProps) {
               className={styles.pageMentionLink}
               draggable={false}
             >
-              {page?.icon ? (
-                <span style={{ marginRight: "4px" }}>{page.icon}</span>
-              ) : (
-                <ActionIcon
-                  variant="transparent"
-                  color="gray"
-                  component="span"
-                  size={18}
-                  style={{ verticalAlign: "text-bottom" }}
-                >
-                  <IconFileDescription size={18} />
-                </ActionIcon>
-              )}
+              <span style={{ marginRight: "4px" }}>
+                <PageIcon icon={page?.icon} iconUrl={page?.iconUrl} />
+              </span>
 
               <span className={styles.pageMentionText}>
                 {page?.title || t("untitled")}

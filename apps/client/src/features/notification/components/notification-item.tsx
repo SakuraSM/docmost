@@ -5,12 +5,7 @@ import {
   Tooltip,
   UnstyledButton,
 } from "@mantine/core";
-import {
-  IconBell,
-  IconCheck,
-  IconFileDescription,
-  IconPointFilled,
-} from "@tabler/icons-react";
+import { IconBell, IconCheck, IconPointFilled } from "@tabler/icons-react";
 import { Avatar } from "@mantine/core";
 import { CustomAvatar } from "@/components/ui/custom-avatar";
 import { INotification } from "../types/notification.types";
@@ -21,6 +16,7 @@ import { useMarkReadMutation } from "../queries/notification-query";
 import { buildPageUrl, getPageTitle } from "@/features/page/page.utils";
 import { formatRelativeTime } from "../notification.utils";
 import classes from "../notification.module.css";
+import { PageIcon } from "@/components/common/page-icon.tsx";
 
 type NotificationItemProps = {
   notification: INotification;
@@ -131,17 +127,7 @@ export function NotificationItem({
 
           {notification.page && (
             <Group gap={4} mt={2} wrap="nowrap">
-              {notification.page.icon ? (
-                <Text size="xs" style={{ flexShrink: 0 }}>
-                  {notification.page.icon}
-                </Text>
-              ) : (
-                <IconFileDescription
-                  size={14}
-                  stroke={1.5}
-                  style={{ flexShrink: 0, color: "var(--mantine-color-dimmed)" }}
-                />
-              )}
+              <PageIcon icon={notification.page.icon} size={14} />
               <Text size="xs" c="dimmed" lineClamp={1}>
                 {getPageTitle(notification.page.title, undefined, t)}
               </Text>
@@ -152,11 +138,7 @@ export function NotificationItem({
         <Group gap={4} wrap="nowrap" align="center" style={{ flexShrink: 0 }}>
           {hovered && isUnread ? (
             <Tooltip label={t("Mark as read")} withArrow>
-              <ActionIcon
-                variant="subtle"
-                size="sm"
-                onClick={handleMarkRead}
-              >
+              <ActionIcon variant="subtle" size="sm" onClick={handleMarkRead}>
                 <IconCheck size={14} />
               </ActionIcon>
             </Tooltip>

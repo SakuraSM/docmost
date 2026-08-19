@@ -6,24 +6,31 @@ import {
   Table,
   Container,
   Title,
-  ThemeIcon,
   Button,
 } from "@mantine/core";
 import { Link } from "react-router-dom";
 import { buildPageUrl, getPageTitle } from "@/features/page/page.utils";
 import { formattedDate } from "@/lib/time";
 import { useFavoritesQuery } from "@/features/favorite/queries/favorite-query";
-import { IconFileDescription, IconStar } from "@tabler/icons-react";
+import { IconStar } from "@tabler/icons-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getSpaceUrl } from "@/lib/config";
 import { useTranslation } from "react-i18next";
 import { getInitialsColor } from "@/lib/get-initials-color";
 import PageListSkeleton from "@/components/ui/page-list-skeleton";
 import rowClasses from "@/components/ui/clickable-table-row.module.css";
+import { PageIcon } from "@/components/common/page-icon.tsx";
 
 export default function FavoritesPage() {
   const { t } = useTranslation();
-  const { data, isLoading, isError, hasNextPage, fetchNextPage, isFetchingNextPage } = useFavoritesQuery("page");
+  const {
+    data,
+    isLoading,
+    isError,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useFavoritesQuery("page");
   const favorites = data?.pages.flatMap((p) => p.items) ?? [];
 
   if (isLoading) {
@@ -72,15 +79,7 @@ export default function FavoritesPage() {
                           )}
                         >
                           <Group wrap="nowrap">
-                            {fav.page.icon || (
-                              <ThemeIcon
-                                variant="transparent"
-                                color="gray"
-                                size={18}
-                              >
-                                <IconFileDescription size={18} />
-                              </ThemeIcon>
-                            )}
+                            <PageIcon icon={fav.page.icon} />
                             <Text fw={500} size="md" lineClamp={1}>
                               {getPageTitle(fav.page.title, undefined, t)}
                             </Text>

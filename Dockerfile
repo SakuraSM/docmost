@@ -1,5 +1,6 @@
 FROM node:26-slim AS base
-LABEL org.opencontainers.image.source="https://github.com/docmost/docmost"
+ARG SOURCE_REPOSITORY=https://github.com/SakuraSM/docmost
+LABEL org.opencontainers.image.source="${SOURCE_REPOSITORY}"
 
 RUN npm install -g pnpm@11.15.1
 
@@ -13,10 +14,6 @@ RUN pnpm install --frozen-lockfile
 RUN pnpm build
 
 FROM base AS installer
-
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends curl bash \
-  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

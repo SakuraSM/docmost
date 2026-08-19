@@ -39,6 +39,8 @@ import {
   getProsemirrorContent,
 } from '../../common/helpers/prosemirror/utils';
 import { htmlToMarkdown } from '@docmost/editor-ext';
+import { parsePageIconAttachmentId } from '../../core/attachment/page-icon.utils';
+import { AttachmentType } from '../../core/attachment/attachment.constants';
 
 type AllowedAttachment = { id: string; fileName: string; filePath: string };
 
@@ -153,7 +155,10 @@ export class ExportService {
     // set to null to make export of pages with parentId work
     pages[parentPageIndex].parentPageId = null;
 
-    const isSinglePage = pages.length === 1 && !includeAttachments;
+    const isSinglePage =
+      pages.length === 1 &&
+      !includeAttachments &&
+      !parsePageIconAttachmentId(pages[0].icon);
 
     if (isSinglePage) {
       const pageContent = await this.exportPage(format, pages[0], true);
@@ -310,7 +315,11 @@ export class ExportService {
         );
 
         if (includeAttachments) {
-          await this.zipAttachments(updatedJsonContent, folder, allowedAttachments);
+          await this.zipAttachments(
+            updatedJsonContent,
+            folder,
+            allowedAttachments,
+          );
           updatedJsonContent =
             updateAttachmentUrlsToLocalPaths(updatedJsonContent);
         }
@@ -328,11 +337,15 @@ export class ExportService {
 
         pageIdToFilePath[page.id] = currentPagePath;
 
+        const iconAssetPath = await this.addPageIconAssetToZip(page, zip);
+        const hasPageImageIcon = Boolean(parsePageIconAttachmentId(page.icon));
+
         const parentPath = parentPageId ? pageIdToFilePath[parentPageId] : null;
         pagesMetadata[currentPagePath] = {
           pageId: page.id,
           slugId: page.slugId,
-          icon: page.icon ?? null,
+          icon: hasPageImageIcon ? null : (page.icon ?? null),
+          ...(iconAssetPath ? { iconAssetPath } : {}),
           position: page.position,
           parentPath,
           createdAt: page.createdAt?.toISOString() ?? new Date().toISOString(),
@@ -354,6 +367,40 @@ export class ExportService {
     };
 
     zip.file('docmost-metadata.json', JSON.stringify(metadata, null, 2));
+  }
+
+  private async addPageIconAssetToZip(
+    page: Page,
+    zip: JSZip,
+  ): Promise<string | null> {
+    const attachmentId = parsePageIconAttachmentId(page.icon);
+    if (!attachmentId) return null;
+
+    const attachment = await this.db
+      .selectFrom('attachments')
+      .select(['id', 'pageId', 'workspaceId', 'type', 'fileName', 'filePath'])
+      .where('id', '=', attachmentId)
+      .executeTakeFirst();
+    if (
+      !attachment ||
+      attachment.type !== AttachmentType.PageIcon ||
+      attachment.pageId !== page.id ||
+      attachment.workspaceId !== page.workspaceId
+    ) {
+      return null;
+    }
+
+    try {
+      const iconAssetPath = `_assets/page-icons/${attachment.fileName}`;
+      zip.file(
+        iconAssetPath,
+        await this.storageService.read(attachment.filePath),
+      );
+      return iconAssetPath;
+    } catch (error) {
+      this.logger.warn(`Failed to export page icon ${attachmentId}`);
+      return null;
+    }
   }
 
   async zipAttachments(
@@ -390,7 +437,9 @@ export class ExportService {
     for (const siblings of Object.values(tree)) {
       for (const page of siblings) {
         if (!spaceId) spaceId = page.spaceId;
-        for (const id of getAttachmentIds(getProsemirrorContent(page.content))) {
+        for (const id of getAttachmentIds(
+          getProsemirrorContent(page.content),
+        )) {
           allAttachmentIds.add(id);
         }
       }
@@ -411,9 +460,7 @@ export class ExportService {
     if (!ignorePermissions && userId) {
       const ownerPageIds = [
         ...new Set(
-          attachments
-            .map((a) => a.pageId)
-            .filter((id): id is string => !!id),
+          attachments.map((a) => a.pageId).filter((id): id is string => !!id),
         ),
       ];
       const accessible = ownerPageIds.length

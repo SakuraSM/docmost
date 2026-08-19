@@ -28,6 +28,11 @@ export class AttachmentProcessor extends WorkerHost implements OnModuleDestroy {
           job.data.pageId,
         );
       }
+      if (job.name === QueueJob.DELETE_UNUSED_PAGE_ICON) {
+        await this.attachmentService.deleteUnusedPageIcon(
+          job.data.attachmentId,
+        );
+      }
       if (job.name === QueueJob.DELETE_AI_CHAT_ATTACHMENTS) {
         await this.attachmentService.handleDeleteAiChatAttachments(
           job.data.aiChatId,
@@ -55,9 +60,7 @@ export class AttachmentProcessor extends WorkerHost implements OnModuleDestroy {
         if (job.name === QueueJob.ATTACHMENT_INDEX_CONTENT) {
           await attachmentEeService.indexAttachment(job.data.attachmentId);
         } else if (job.name === QueueJob.ATTACHMENT_INDEXING) {
-          await attachmentEeService.indexAttachments(
-            job.data.workspaceId,
-          );
+          await attachmentEeService.indexAttachments(job.data.workspaceId);
         }
       }
     } catch (err) {

@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import * as path from 'path';
 import { jsonToText } from '../../../collaboration/collaboration.util';
 import { InjectKysely } from 'nestjs-kysely';
-import { KyselyDB } from '@docmost/db/types/kysely.types';
+import { KyselyDB, KyselyTransaction } from '@docmost/db/types/kysely.types';
 import {
   extractZip,
   FileImportSource,
@@ -42,6 +42,16 @@ import {
   AUDIT_SERVICE,
   IAuditService,
 } from '../../../integrations/audit/audit.service';
+import {
+  AttachmentType,
+  validImageExtensions,
+} from '../../../core/attachment/attachment.constants';
+import { getAttachmentFolderPath } from '../../../core/attachment/attachment.utils';
+import {
+  buildPageIconValue,
+  isValidPageIconImage,
+  parsePageIconAttachmentId,
+} from '../../../core/attachment/page-icon.utils';
 
 @Injectable()
 export class FileImportTaskService {
@@ -192,7 +202,10 @@ export class FileImportTaskService {
         parentPageId: null,
         fileExtension: ext,
         filePath: relPath,
-        icon: pageMetadata?.icon ?? null,
+        icon: parsePageIconAttachmentId(pageMetadata?.icon)
+          ? null
+          : (pageMetadata?.icon ?? null),
+        iconAssetPath: pageMetadata?.iconAssetPath,
       });
     }
 
@@ -264,7 +277,8 @@ export class FileImportTaskService {
           const partialId = extractNotionPartialId(folderName);
           const strippedFolderName = stripNotionID(folderName);
           const isSameDir = (fileDir: string) =>
-            fileDir === parentDir || (parentDir === '.' && !fileDir.includes('/'));
+            fileDir === parentDir ||
+            (parentDir === '.' && !fileDir.includes('/'));
 
           for (const [filePath, page] of pagesMap.entries()) {
             if (!isSameDir(path.dirname(filePath))) continue;
@@ -276,7 +290,10 @@ export class FileImportTaskService {
               const fullIdMatch = fileBase.match(/[a-f0-9]{32}$/i);
               if (!fullIdMatch) continue;
               const fullId = fullIdMatch[0].toLowerCase();
-              if (!fullId.startsWith(partialId.prefix) || !fullId.endsWith(partialId.suffix)) {
+              if (
+                !fullId.startsWith(partialId.prefix) ||
+                !fullId.endsWith(partialId.suffix)
+              ) {
                 continue;
               }
             }
@@ -464,6 +481,7 @@ export class FileImportTaskService {
     const validPageIds = new Set<string>();
     const pageTitles = new Map<string, string>();
     let totalPagesProcessed = 0;
+    const uploadedPageIconPaths = new Set<string>();
 
     // Sort levels to process in order
     const sortedLevels = Array.from(pagesByLevel.keys()).sort((a, b) => a - b);
@@ -522,11 +540,20 @@ export class FileImportTaskService {
             const { title, prosemirrorJson } =
               this.importService.extractTitleAndRemoveHeading(pmState);
 
+            const importedPageIcon = await this.importPageIconAsset({
+              extractDir,
+              iconAssetPath: page.iconAssetPath,
+              page,
+              fileTask,
+              trx,
+              uploadedPaths: uploadedPageIconPaths,
+            });
+
             const insertablePage: InsertablePage = {
               id: page.id,
               slugId: page.slugId,
               title: title || page.name,
-              icon: page.icon || pageIcon || null,
+              icon: importedPageIcon || page.icon || pageIcon || null,
               content: prosemirrorJson,
               textContent: jsonToText(prosemirrorJson),
               ydoc: await this.importService.createYdoc(prosemirrorJson),
@@ -606,8 +633,89 @@ export class FileImportTaskService {
         });
       }
     } catch (error) {
+      await Promise.allSettled(
+        Array.from(uploadedPageIconPaths).map((filePath) =>
+          this.storageService.delete(filePath),
+        ),
+      );
       this.logger.error('Failed to import files:', error);
       throw new Error(`File import failed: ${error?.['message']}`);
+    }
+  }
+
+  private async importPageIconAsset(opts: {
+    extractDir: string;
+    iconAssetPath?: string;
+    page: ImportPageNode;
+    fileTask: FileTask;
+    trx: KyselyTransaction;
+    uploadedPaths: Set<string>;
+  }): Promise<string | null> {
+    const { extractDir, iconAssetPath, page, fileTask, trx, uploadedPaths } =
+      opts;
+    if (!iconAssetPath) return null;
+
+    const normalizedPath = path.posix.normalize(iconAssetPath);
+    if (
+      path.posix.isAbsolute(normalizedPath) ||
+      normalizedPath.startsWith('../') ||
+      !normalizedPath.startsWith('_assets/page-icons/')
+    ) {
+      this.logger.warn(`Skipped unsafe page icon path: ${iconAssetPath}`);
+      return null;
+    }
+
+    const absolutePath = path.resolve(extractDir, normalizedPath);
+    const extractionRoot = `${path.resolve(extractDir)}${path.sep}`;
+    if (!absolutePath.startsWith(extractionRoot)) return null;
+
+    let uploadedFilePath: string | null = null;
+    try {
+      const fileExtension = path.extname(absolutePath).toLowerCase();
+      if (!validImageExtensions.includes(fileExtension)) return null;
+
+      const buffer = await fs.readFile(absolutePath);
+      const expectedType = fileExtension === '.png' ? 'png' : 'jpeg';
+      if (!isValidPageIconImage(new Uint8Array(buffer), fileExtension)) {
+        return null;
+      }
+
+      const attachmentId = v7();
+      const fileName = `${attachmentId}${fileExtension}`;
+      const filePath = `${getAttachmentFolderPath(AttachmentType.PageIcon, fileTask.workspaceId)}/${fileName}`;
+      await this.storageService.upload(filePath, buffer);
+      uploadedFilePath = filePath;
+      uploadedPaths.add(filePath);
+      await trx
+        .insertInto('attachments')
+        .values({
+          id: attachmentId,
+          fileName,
+          filePath,
+          fileSize: buffer.length,
+          fileExt: fileExtension,
+          mimeType: expectedType === 'png' ? 'image/png' : 'image/jpeg',
+          type: AttachmentType.PageIcon,
+          creatorId: fileTask.creatorId,
+          pageId: page.id,
+          spaceId: fileTask.spaceId,
+          workspaceId: fileTask.workspaceId,
+        })
+        .execute();
+      return buildPageIconValue(attachmentId);
+    } catch (error) {
+      if (uploadedFilePath) {
+        try {
+          await this.storageService.delete(uploadedFilePath);
+          uploadedPaths.delete(uploadedFilePath);
+        } catch (cleanupError) {
+          this.logger.warn(
+            `Failed to clean imported page icon: ${uploadedFilePath}`,
+          );
+        }
+      }
+      this.logger.warn(`Skipped unreadable page icon: ${iconAssetPath}`);
+      return null;
     }
   }
 

@@ -1,11 +1,12 @@
 import { KeyboardEvent, useState } from "react";
 import { ActionIcon } from "@mantine/core";
-import { IconChevronRight, IconFileDescription } from "@tabler/icons-react";
+import { IconChevronRight } from "@tabler/icons-react";
 import { useTranslation } from "react-i18next";
 import { IPage } from "@/features/page/types/page.types";
 import { getPageTitle } from "@/features/page/page.utils";
 import { PageChildren } from "./page-children";
 import classes from "./destination-picker.module.css";
+import { PageIcon } from "@/components/common/page-icon.tsx";
 
 type PageRowProps = {
   page: Partial<IPage>;
@@ -81,18 +82,7 @@ export function PageRow({
         )}
 
         <div className={classes.iconWrapper}>
-          {page.icon ? (
-            page.icon
-          ) : (
-            <ActionIcon
-              component="div"
-              variant="transparent"
-              c="gray"
-              size={22}
-            >
-              <IconFileDescription size={18} />
-            </ActionIcon>
-          )}
+          <PageIcon icon={page.icon} isBase={page.isBase} />
         </div>
 
         <div className={classes.pageTitle}>

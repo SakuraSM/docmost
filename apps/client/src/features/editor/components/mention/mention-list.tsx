@@ -21,8 +21,9 @@ import {
 import clsx from "clsx";
 import classes from "./mention.module.css";
 import { CustomAvatar } from "@/components/ui/custom-avatar.tsx";
-import { IconFileDescription, IconPlus } from "@tabler/icons-react";
+import { IconPlus } from "@tabler/icons-react";
 import { useSpaceQuery } from "@/features/space/queries/space-query.ts";
+import { PageIcon } from "@/components/common/page-icon.tsx";
 import { useParams } from "react-router-dom";
 import { v7 as uuid7 } from "uuid";
 import { useAtom } from "jotai";
@@ -428,9 +429,7 @@ const MentionList = forwardRef<any, MentionListProps>((props, ref) => {
                     color="gray"
                     size="sm"
                   >
-                    {item.icon || (
-                      <IconFileDescription size={18} stroke={1.5} />
-                    )}
+                    <PageIcon icon={item.icon} />
                   </ActionIcon>
 
                   <div style={{ flex: 1, minWidth: 0 }}>

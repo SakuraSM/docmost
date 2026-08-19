@@ -16,19 +16,11 @@ import { Link, useParams } from "react-router-dom";
 import classes from "./breadcrumb.module.css";
 import { SpaceTreeNode } from "@/features/page/tree/types.ts";
 import { buildPageUrl, getPageTitle } from "@/features/page/page.utils.ts";
-import type { TFunction } from "i18next";
 import { usePageQuery } from "@/features/page/queries/page-query.ts";
 import { extractPageSlugId } from "@/lib";
 import { useMediaQuery } from "@mantine/hooks";
 import { useTranslation } from "react-i18next";
-
-function getTitle(node: SpaceTreeNode, t: TFunction) {
-  const name = getPageTitle(node.name, node.isBase, t);
-  if (node.icon) {
-    return `${node.icon} ${name}`;
-  }
-  return name;
-}
+import { PageIcon } from "@/components/common/page-icon.tsx";
 
 export default function Breadcrumb() {
   const { t } = useTranslation();
@@ -59,8 +51,13 @@ export default function Breadcrumb() {
           variant="default"
           style={{ border: "none" }}
         >
-          <Text fz={"sm"} className={classes.truncatedText}>
-            {getTitle(node, t)}
+          <Text
+            fz={"sm"}
+            className={classes.truncatedText}
+            style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+          >
+            <PageIcon icon={node.icon} isBase={node.isBase} />
+            {getPageTitle(node.name, node.isBase, t)}
           </Text>
         </Button>
       </Button.Group>
@@ -76,8 +73,13 @@ export default function Breadcrumb() {
           variant="default"
           style={{ border: "none" }}
         >
-          <Text fz={"sm"} className={classes.truncatedText}>
-            {getTitle(node, t)}
+          <Text
+            fz={"sm"}
+            className={classes.truncatedText}
+            style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+          >
+            <PageIcon icon={node.icon} isBase={node.isBase} />
+            {getPageTitle(node.name, node.isBase, t)}
           </Text>
         </Button>
       </Button.Group>
@@ -95,7 +97,12 @@ export default function Breadcrumb() {
           className={classes.truncatedText}
           aria-current={isCurrent ? "page" : undefined}
         >
-          {getTitle(node, t)}
+          <span
+            style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+          >
+            <PageIcon icon={node.icon} isBase={node.isBase} />
+            {getPageTitle(node.name, node.isBase, t)}
+          </span>
         </Anchor>
       </Tooltip>
     ),

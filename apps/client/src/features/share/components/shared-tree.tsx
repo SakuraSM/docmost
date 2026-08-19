@@ -12,7 +12,6 @@ import clsx from "clsx";
 import {
   IconChevronDown,
   IconChevronRight,
-  IconFileDescription,
   IconPointFilled,
 } from "@tabler/icons-react";
 import { ActionIcon, Box } from "@mantine/core";
@@ -27,6 +26,7 @@ import {
   type RenderRowProps,
 } from "@/features/page/tree/components/doc-tree";
 import { openSharedTreeNodesAtom } from "@/features/share/atoms/open-shared-tree-nodes-atom";
+import { PageIcon } from "@/components/common/page-icon.tsx";
 
 interface SharedTreeProps {
   sharedPageTree: ISharedPageTree;
@@ -46,10 +46,7 @@ export default function SharedTree({ sharedPageTree }: SharedTreeProps) {
   }, [sharedPageTree?.pageTree]);
 
   const openIds = useMemo(
-    () =>
-      new Set(
-        Object.keys(openTreeNodes).filter((k) => openTreeNodes[k]),
-      ),
+    () => new Set(Object.keys(openTreeNodes).filter((k) => openTreeNodes[k])),
     [openTreeNodes],
   );
 
@@ -151,13 +148,7 @@ function SharedTreeRow({
       <div style={{ marginRight: "4px" }}>
         <EmojiPicker
           onEmojiSelect={() => {}}
-          icon={
-            node.icon ? (
-              node.icon
-            ) : (
-              <IconFileDescription size="18" />
-            )
-          }
+          icon={<PageIcon icon={node.icon} iconUrl={node.iconUrl} />}
           readOnly={true}
           removeEmojiAction={() => {}}
           actionIconProps={{ tabIndex: -1 }}
