@@ -3,6 +3,7 @@ import {
   ActionIcon,
   Popover,
   Button,
+  FileButton,
   Group,
   useMantineColorScheme,
 } from "@mantine/core";
@@ -59,7 +60,7 @@ function EmojiPicker({
   const [target, setTarget] = useState<HTMLElement | null>(null);
   const [dropdown, setDropdown] = useState<HTMLDivElement | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const resetFileInputRef = useRef<() => void>(null);
 
   const closeAndRestoreFocus = () => {
     handlers.close();
@@ -123,15 +124,8 @@ function EmojiPicker({
     closeAndRestoreFocus();
   };
 
-  const handleUploadImage = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleImageChange = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
+  const handleImageChange = async (file: File | null) => {
+    resetFileInputRef.current?.();
     if (!file || !onImageSelect) return;
 
     try {
@@ -187,43 +181,48 @@ function EmojiPicker({
         </ActionIcon>
       </Popover.Target>
       <Suspense fallback={null}>
-        <Popover.Dropdown bg="000" style={{ border: "none" }} ref={setDropdown}>
+        <Popover.Dropdown
+          bg="000"
+          p={0}
+          style={{ border: "none", overflow: "hidden" }}
+          ref={setDropdown}
+        >
           <Picker
             onEmojiSelect={handleEmojiSelect}
             perLine={8}
             skinTonePosition="search"
             theme={colorScheme}
           />
-          {onImageSelect && (
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg"
-              aria-label={t("Upload image")}
-              tabIndex={-1}
-              onChange={handleImageChange}
-              style={{ display: "none" }}
-            />
-          )}
           <Group
+            data-testid="page-icon-picker-actions"
             gap="xs"
+            justify="flex-end"
+            p="xs"
             style={{
-              position: "absolute",
-              zIndex: 2,
-              bottom: "1rem",
-              right: "1rem",
+              borderTop: "1px solid var(--mantine-color-default-border)",
+              background: "var(--mantine-color-body)",
             }}
           >
             {onImageSelect && (
-              <Button
-                variant="default"
-                c="gray"
-                size="xs"
-                loading={isUploadingImage}
-                onClick={handleUploadImage}
+              <FileButton
+                onChange={handleImageChange}
+                accept="image/png,image/jpeg"
+                resetRef={resetFileInputRef}
+                inputProps={{ "aria-label": t("Upload image") }}
               >
-                {t("Upload image")}
-              </Button>
+                {(fileButtonProps) => (
+                  <Button
+                    {...fileButtonProps}
+                    variant="default"
+                    c="gray"
+                    size="xs"
+                    loading={isUploadingImage}
+                    disabled={isUploadingImage}
+                  >
+                    {t("Upload image")}
+                  </Button>
+                )}
+              </FileButton>
             )}
             <Button
               variant="default"
