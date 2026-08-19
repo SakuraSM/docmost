@@ -246,7 +246,7 @@ export class ShareService {
     };
   }
 
-  private async addPublicPageIconUrls<T extends PublicPageIconSource>(
+  async addPublicPageIconUrls<T extends PublicPageIconSource>(
     pages: T[],
     workspaceId: string,
   ): Promise<Array<T & { iconUrl?: string }>> {

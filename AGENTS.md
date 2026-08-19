@@ -8,7 +8,7 @@ put durable detail in the linked documents.
 - `apps/client`: React 19 and Vite web client.
 - `apps/server`: NestJS and Fastify API, workers, and collaboration server.
 - `packages/editor-ext`: shared editor extensions.
-- `packages/db`: database repositories and shared database types.
+- `apps/server/src/database`: migrations, repositories, and generated Kysely types.
 - `packages/base-formula`: database-formula parsing and evaluation.
 - `docs`: fork-specific development documentation.
 - `ARCHITECTURE.md`: system boundaries and major data flows.

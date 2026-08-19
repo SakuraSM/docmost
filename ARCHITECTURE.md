@@ -15,7 +15,7 @@ queries after mutations.
 
 The NestJS application in `apps/server` uses Fastify for HTTP. Controllers
 perform request parsing and authentication, domain services enforce behavior,
-and repositories in `packages/db` isolate Kysely queries. The collaboration
+and repositories in `apps/server/src/database` isolate Kysely queries. The collaboration
 entry point runs separately and coordinates Yjs document updates.
 
 PostgreSQL 16 or newer stores workspaces, spaces, pages, history, permissions,

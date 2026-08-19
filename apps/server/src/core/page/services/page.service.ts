@@ -815,8 +815,10 @@ export class PageService {
             newAttachmentId,
           );
 
+          let copiedToStorage = false;
           try {
             await this.storageService.copy(attachment.filePath, newPathFile);
+            copiedToStorage = true;
 
             await this.db
               .insertInto('attachments')
@@ -849,6 +851,15 @@ export class PageService {
               err,
             );
             if (attachment.type === AttachmentType.PageIcon) {
+              if (copiedToStorage) {
+                try {
+                  await this.storageService.delete(newPathFile);
+                } catch (cleanupError) {
+                  this.logger.warn(
+                    `Duplicate page: failed to clean copied page icon ${newPathFile}`,
+                  );
+                }
+              }
               await this.pageRepo.updatePage({ icon: null }, newPageId);
             }
             // Continue with other attachments even if one fails
