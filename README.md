@@ -14,6 +14,20 @@
 
 To get started with Docmost, please refer to our [documentation](https://docmost.com/docs) or try our [cloud version](https://docmost.com/pricing) .
 
+## Fork container image
+
+This fork publishes multi-platform images to GitHub Container Registry. Fork
+release tags use `v<upstream-version>-sakura.<revision>` so they cannot be
+mistaken for upstream releases.
+
+```bash
+docker pull ghcr.io/sakurasm/docmost:sakura-latest
+docker pull ghcr.io/sakurasm/docmost:0.95.0-sakura.1
+```
+
+See the [development guide](docs/DEVELOPMENT.md#publish-a-fork-release) for the
+release commands and generated artifacts.
+
 ## Features
 
 - Real-time collaboration

@@ -88,6 +88,36 @@ For a disposable full stack, first replace the placeholder secrets in
 `docker-compose.yml`, then run `docker compose up --build`. Do not reuse those
 example credentials in a shared or production environment.
 
+## Publish a fork release
+
+Use `v<upstream-version>-sakura.<revision>` for every fork release. For
+example, the first fork release based on upstream `v0.95.0` is
+`v0.95.0-sakura.1`.
+
+Publish from a commit already merged into `main`:
+
+```bash
+git checkout main
+git pull --ff-only origin main
+git tag v0.95.0-sakura.1
+git push origin v0.95.0-sakura.1
+```
+
+You can also start the workflow without creating the tag first:
+
+```bash
+gh workflow run release.yml -f version=v0.95.0-sakura.1
+```
+
+The Release workflow publishes these outputs:
+
+- `ghcr.io/sakurasm/docmost:0.95.0-sakura.1`
+- `ghcr.io/sakurasm/docmost:sakura-latest`
+- AMD64 and ARM64 Docker archives attached to a GitHub prerelease
+
+The workflow rejects upstream-style tags such as `v0.95.0`. Increment the
+fork revision for another release from the same upstream version.
+
 ## Before opening a change
 
 - Run tests closest to the changed behavior.
