@@ -3,11 +3,11 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      - "v*-sakura.*"
   workflow_dispatch:
     inputs:
       version:
-        description: "Version tag (e.g. v0.25.3)"
+        description: "Fork version tag (e.g. v0.95.0-sakura.1)"
         required: true
 
 permissions:
@@ -18,7 +18,19 @@ env:
   VERSION: ${{ inputs.version || github.ref_name }}
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate fork version
+        shell: bash
+        run: |
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-sakura\.[0-9]+$ ]]; then
+            echo "Expected v<upstream-version>-sakura.<revision>, for example v0.95.0-sakura.1"
+            exit 1
+          fi
+
   build:
+    needs: validate
     strategy:
       matrix:
         include:
@@ -86,7 +98,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           push: false
           tags: |
-            ${{ steps.image.outputs.name }}:latest
+            ${{ steps.image.outputs.name }}:sakura-latest
             ${{ steps.image.outputs.name }}:${{ steps.strip-v.outputs.version }}
           build-args: |
             SOURCE_REPOSITORY=https://github.com/${{ github.repository }}
@@ -104,7 +116,9 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: build
+    needs:
+      - validate
+      - build
     runs-on: ubuntu-latest
     steps:
       - name: Set image name
@@ -136,8 +150,7 @@ jobs:
           images: ${{ steps.image.outputs.name }}
           tags: |
             type=semver,pattern={{version}},value=${{ env.VERSION }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ env.VERSION }},enable=${{ !contains(env.VERSION, '-') }}
-            type=raw,value=latest,enable=${{ !contains(env.VERSION, '-') }}
+            type=raw,value=sakura-latest
 
       - name: Create manifest list and push
         working-directory: /tmp/digests
@@ -157,7 +170,10 @@ jobs:
         with:
           tag_name: ${{ env.VERSION }}
           target_commitish: ${{ github.sha }}
+          name: Docmost ${{ env.VERSION }}
+          generate_release_notes: true
+          prerelease: true
           files: |
             /tmp/images/docmost-amd64.docker.tar.gz
             /tmp/images/docmost-arm64.docker.tar.gz
-          draft: true
+          draft: false
