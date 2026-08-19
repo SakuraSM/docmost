@@ -69,6 +69,8 @@ export function getAttachmentFolderPath(
       return `${workspaceId}/workspace-logos`;
     case AttachmentType.SpaceIcon:
       return `${workspaceId}/space-logos`;
+    case AttachmentType.PageIcon:
+      return `${workspaceId}/page-icons`;
     case AttachmentType.File:
       return `${workspaceId}/files`;
     case AttachmentType.Chat:

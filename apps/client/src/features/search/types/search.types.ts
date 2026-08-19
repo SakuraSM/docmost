@@ -7,6 +7,7 @@ export interface IPageSearch {
   id: string;
   title: string;
   icon: string;
+  iconUrl?: string;
   parentPageId: string;
   slugId: string;
   creatorId: string;

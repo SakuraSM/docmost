@@ -18,6 +18,7 @@ import { AttachmentRepo } from '@docmost/db/repos/attachment/attachment.repo';
 import { AttachmentType, validImageExtensions } from '../attachment.constants';
 import { KyselyDB, KyselyTransaction } from '@docmost/db/types/kysely.types';
 import { Attachment, User, Workspace } from '@docmost/db/types/entity.types';
+import { Page } from '@docmost/db/types/entity.types';
 import { InjectKysely } from 'nestjs-kysely';
 import { executeTx } from '@docmost/db/utils';
 import { UserRepo } from '@docmost/db/repos/user/user.repo';
@@ -27,6 +28,12 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { QueueJob, QueueName } from '../../../integrations/queue/constants';
 import { Queue } from 'bullmq';
 import { createByteCountingStream } from '../../../common/helpers/utils';
+import { PageRepo } from '@docmost/db/repos/page/page.repo';
+import {
+  buildPageIconValue,
+  isValidPageIconImage,
+  parsePageIconAttachmentId,
+} from '../page-icon.utils';
 
 @Injectable()
 export class AttachmentService {
@@ -37,6 +44,7 @@ export class AttachmentService {
     private readonly userRepo: UserRepo,
     private readonly workspaceRepo: WorkspaceRepo,
     private readonly spaceRepo: SpaceRepo,
+    private readonly pageRepo: PageRepo,
     @InjectKysely() private readonly db: KyselyDB,
     @InjectQueue(QueueName.ATTACHMENT_QUEUE) private attachmentQueue: Queue,
   ) {}
@@ -231,6 +239,76 @@ export class AttachmentService {
     return attachment;
   }
 
+  async uploadPageIcon(opts: {
+    filePromise: Promise<MultipartFile>;
+    page: Page;
+    userId: string;
+  }): Promise<{ attachment: Attachment; icon: string }> {
+    const { filePromise, page, userId } = opts;
+    const preparedFile = await prepareFile(filePromise);
+    validateFileType(preparedFile.fileExtension, validImageExtensions);
+    if (!preparedFile.buffer) {
+      throw new BadRequestException('Invalid page icon image');
+    }
+
+    if (
+      !isValidPageIconImage(
+        new Uint8Array(preparedFile.buffer),
+        preparedFile.fileExtension,
+      )
+    ) {
+      throw new BadRequestException('Invalid page icon image');
+    }
+
+    const attachmentId = uuid7();
+    preparedFile.fileName = `${attachmentId}${preparedFile.fileExtension}`;
+    const filePath = `${getAttachmentFolderPath(AttachmentType.PageIcon, page.workspaceId)}/${preparedFile.fileName}`;
+    const icon = buildPageIconValue(attachmentId);
+    const previousAttachmentId = parsePageIconAttachmentId(page.icon);
+
+    await this.uploadToDrive(filePath, preparedFile.buffer);
+
+    let attachment: Attachment | null = null;
+    try {
+      await executeTx(this.db, async (trx) => {
+        attachment = await this.saveAttachment({
+          attachmentId,
+          preparedFile,
+          filePath,
+          type: AttachmentType.PageIcon,
+          userId,
+          workspaceId: page.workspaceId,
+          pageId: page.id,
+          spaceId: page.spaceId,
+          trx,
+        });
+        await this.pageRepo.updatePage({ icon }, page.id, trx);
+      });
+    } catch (error) {
+      await this.deleteRedundantFile(filePath);
+      throw new BadRequestException('Failed to upload page icon');
+    }
+
+    if (previousAttachmentId) {
+      try {
+        await this.attachmentQueue.add(
+          QueueJob.DELETE_UNUSED_PAGE_ICON,
+          { attachmentId: previousAttachmentId },
+          { jobId: `delete-unused-page-icon-${previousAttachmentId}` },
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Failed to queue old page icon cleanup: ${previousAttachmentId}`,
+        );
+      }
+    }
+
+    if (!attachment) {
+      throw new BadRequestException('Failed to upload page icon');
+    }
+    return { attachment, icon };
+  }
+
   async deleteRedundantFile(filePath: string) {
     try {
       await this.storageService.delete(filePath);
@@ -423,6 +501,30 @@ export class AttachmentService {
       );
       throw err;
     }
+  }
+
+  async deleteUnusedPageIcon(attachmentId: string): Promise<void> {
+    const attachment = await this.attachmentRepo.findById(attachmentId);
+    if (!attachment || attachment.type !== AttachmentType.PageIcon) return;
+
+    const icon = buildPageIconValue(attachmentId);
+    const [pageReference, historyReference] = await Promise.all([
+      this.db
+        .selectFrom('pages')
+        .select('id')
+        .where('icon', '=', icon)
+        .limit(1)
+        .executeTakeFirst(),
+      this.db
+        .selectFrom('pageHistory')
+        .select('id')
+        .where('icon', '=', icon)
+        .limit(1)
+        .executeTakeFirst(),
+    ]);
+
+    if (pageReference || historyReference) return;
+    await this.deleteRedundantFile(attachment.filePath);
   }
 
   async removeUserAvatar(user: User) {

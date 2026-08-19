@@ -2,6 +2,7 @@ export type ExportPageMetadata = {
   pageId: string;
   slugId: string;
   icon: string | null;
+  iconAssetPath?: string;
   position: string;
   parentPath: string | null;
   createdAt: string;

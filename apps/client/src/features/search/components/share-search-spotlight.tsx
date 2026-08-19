@@ -39,7 +39,7 @@ export function ShareSearchSpotlight({ shareId }: ShareSearchSpotlightProps) {
       style={{ userSelect: "none" }}
     >
       <Group wrap="nowrap" w="100%">
-        <Center>{getPageIcon(page?.icon)}</Center>
+        <Center>{getPageIcon(page?.icon, 18, page?.iconUrl)}</Center>
 
         <div style={{ flex: 1 }}>
           <Text>{page.title}</Text>
@@ -51,7 +51,7 @@ export function ShareSearchSpotlight({ shareId }: ShareSearchSpotlightProps) {
               dangerouslySetInnerHTML={{
                 __html: DOMPurify.sanitize(page.highlight, {
                   ALLOWED_TAGS: ["mark", "em", "strong", "b"],
-                  ALLOWED_ATTR: []
+                  ALLOWED_ATTR: [],
                 }),
               }}
             />

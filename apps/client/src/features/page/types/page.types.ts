@@ -6,6 +6,7 @@ export interface IPage {
   title: string;
   content: string;
   icon: string;
+  iconUrl?: string;
   coverPhoto: string;
   parentPageId: string;
   creatorId: string;

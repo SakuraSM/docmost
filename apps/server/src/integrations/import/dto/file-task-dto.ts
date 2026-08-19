@@ -16,4 +16,5 @@ export type ImportPageNode = {
   fileExtension: string;
   filePath: string;
   icon?: string | null;
+  iconAssetPath?: string;
 };

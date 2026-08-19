@@ -26,10 +26,7 @@ import { AuthWorkspace } from '../../common/decorators/auth-workspace.decorator'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Attachment, User, Workspace } from '@docmost/db/types/entity.types';
 import { StorageService } from '../../integrations/storage/storage.service';
-import {
-  getAttachmentFolderPath,
-  validAttachmentTypes,
-} from './attachment.utils';
+import { getAttachmentFolderPath } from './attachment.utils';
 import { getMimeType } from '../../common/helpers';
 import {
   AttachmentType,
@@ -304,10 +301,12 @@ export class AttachmentController {
       throw new BadRequestException('attachment type is required');
     }
 
-    if (
-      !validAttachmentTypes.includes(attachmentType) ||
-      attachmentType === AttachmentType.File
-    ) {
+    const uploadableImageTypes = [
+      AttachmentType.Avatar,
+      AttachmentType.SpaceIcon,
+      AttachmentType.WorkspaceIcon,
+    ];
+    if (!uploadableImageTypes.includes(attachmentType)) {
       throw new BadRequestException('Invalid image attachment type');
     }
 
@@ -352,6 +351,48 @@ export class AttachmentController {
     }
   }
 
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @Post('attachments/page-icon')
+  @UseInterceptors(FileInterceptor)
+  async uploadPageIcon(
+    @Req() req: any,
+    @AuthUser() user: User,
+    @AuthWorkspace() workspace: Workspace,
+  ) {
+    const maxFileSize = bytes(MAX_AVATAR_SIZE);
+    let file;
+    try {
+      file = await req.file({
+        limits: { fileSize: maxFileSize, fields: 2, files: 1 },
+      });
+    } catch (error: any) {
+      if (error?.statusCode === 413) {
+        throw new BadRequestException(
+          `File too large. Exceeds the ${MAX_AVATAR_SIZE} limit`,
+        );
+      }
+      throw new BadRequestException('Invalid file upload');
+    }
+
+    const pageId = file?.fields?.pageId?.value;
+    if (!file || !pageId || !isValidUUID(pageId)) {
+      throw new BadRequestException('A valid pageId and image are required');
+    }
+
+    const page = await this.pageRepo.findById(pageId);
+    if (!page || page.deletedAt || page.workspaceId !== workspace.id) {
+      throw new NotFoundException('Page not found');
+    }
+    await this.pageAccessService.validateCanEdit(page, user);
+
+    return this.attachmentService.uploadPageIcon({
+      filePromise: Promise.resolve(file),
+      page,
+      userId: user.id,
+    });
+  }
+
   @Get('attachments/img/:attachmentType/:fileName')
   async getLogoOrAvatar(
     @Res() res: FastifyReply,
@@ -359,10 +400,12 @@ export class AttachmentController {
     @Param('attachmentType') attachmentType: AttachmentType,
     @Param('fileName') fileName?: string,
   ) {
-    if (
-      !validAttachmentTypes.includes(attachmentType) ||
-      attachmentType === AttachmentType.File
-    ) {
+    const publicImageTypes = [
+      AttachmentType.Avatar,
+      AttachmentType.SpaceIcon,
+      AttachmentType.WorkspaceIcon,
+    ];
+    if (!publicImageTypes.includes(attachmentType)) {
       throw new BadRequestException('Invalid image attachment type');
     }
 

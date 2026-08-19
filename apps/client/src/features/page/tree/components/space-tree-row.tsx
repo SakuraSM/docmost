@@ -3,15 +3,15 @@ import { Link, useParams } from "react-router-dom";
 import { useAtom } from "jotai";
 import { useTranslation } from "react-i18next";
 import { ActionIcon, rem } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import {
   IconChevronDown,
   IconChevronRight,
-  IconFileDescription,
   IconPlus,
   IconPointFilled,
-  IconTable,
 } from "@tabler/icons-react";
 
+import { PageIcon } from "@/components/common/page-icon.tsx";
 import EmojiPicker from "@/components/ui/emoji-picker.tsx";
 import { queryClient } from "@/main.tsx";
 import { buildPageUrl } from "@/features/page/page.utils.ts";
@@ -20,6 +20,7 @@ import { getPageById } from "@/features/page/services/page-service.ts";
 import {
   useUpdatePageMutation,
   fetchAllAncestorChildren,
+  invalidateOnUpdatePage,
 } from "@/features/page/queries/page-query.ts";
 import { useQueryEmit } from "@/features/websocket/use-query-emit.ts";
 import { mobileSidebarAtom } from "@/components/layouts/global/hooks/atoms/sidebar-atom.ts";
@@ -33,6 +34,8 @@ import type { RenderRowProps } from "./doc-tree";
 import { NodeMenu } from "./space-tree-node-menu";
 import classes from "@/features/page/tree/styles/tree.module.css";
 import { updateTreeNodeIcon } from "@/features/page/tree/utils/utils.ts";
+import { uploadPageIcon } from "@/features/attachments/services/attachment-service.ts";
+import type { IPage } from "@/features/page/types/page.types.ts";
 
 type SpaceTreeRowProps = RenderRowProps<SpaceTreeNode> & {
   readOnly: boolean;
@@ -81,9 +84,7 @@ export function SpaceTreeRow({
   };
 
   const handleUpdateNodeIcon = (nodeId: string, newIcon: string | null) => {
-    setTreeData((prev) =>
-      updateTreeNodeIcon(prev, nodeId, newIcon),
-    );
+    setTreeData((prev) => updateTreeNodeIcon(prev, nodeId, newIcon));
   };
 
   const handleEmojiIconClick = (e: React.MouseEvent) => {
@@ -91,36 +92,64 @@ export function SpaceTreeRow({
     e.stopPropagation();
   };
 
-  const handleEmojiSelect = (emoji: { native: string }) => {
-    handleUpdateNodeIcon(node.id, emoji.native);
-    updatePageMutation
-      .mutateAsync({ pageId: node.id, icon: emoji.native })
-      .then((data) => {
-        setTimeout(() => {
-          emit({
-            operation: "updateOne",
-            spaceId: node.spaceId,
-            entity: ["pages"],
-            id: node.id,
-            payload: { icon: emoji.native, parentPageId: data.parentPageId },
-          });
-        }, 50);
-      });
+  const publishIconUpdate = (icon: string | null, parentPageId?: string) => {
+    handleUpdateNodeIcon(node.id, icon);
+    for (const pageKey of [node.id, node.slugId]) {
+      queryClient.setQueryData<IPage>(["pages", pageKey], (page) =>
+        page ? { ...page, icon: icon ?? "" } : page,
+      );
+    }
+    emit({
+      operation: "updateOne",
+      spaceId: node.spaceId,
+      entity: ["pages"],
+      id: node.id,
+      payload: { icon, parentPageId: parentPageId ?? node.parentPageId },
+    });
   };
 
-  const handleRemoveEmoji = () => {
-    handleUpdateNodeIcon(node.id, null);
-    updatePageMutation.mutateAsync({ pageId: node.id, icon: null });
-
-    setTimeout(() => {
-      emit({
-        operation: "updateOne",
-        spaceId: node.spaceId,
-        entity: ["pages"],
-        id: node.id,
-        payload: { icon: null },
+  const handleEmojiSelect = async (emoji: { native: string }) => {
+    try {
+      const page = await updatePageMutation.mutateAsync({
+        pageId: node.id,
+        icon: emoji.native,
       });
-    }, 50);
+      publishIconUpdate(emoji.native, page.parentPageId);
+    } catch (error) {
+      console.error(error);
+      notifications.show({
+        message: t("Failed to update page"),
+        color: "red",
+      });
+    }
+  };
+
+  const handleRemoveEmoji = async () => {
+    try {
+      const page = await updatePageMutation.mutateAsync({
+        pageId: node.id,
+        icon: null,
+      });
+      publishIconUpdate(null, page.parentPageId);
+    } catch (error) {
+      console.error(error);
+      notifications.show({
+        message: t("Failed to update page"),
+        color: "red",
+      });
+    }
+  };
+
+  const handleImageSelect = async (file: File) => {
+    const result = await uploadPageIcon(file, node.id);
+    publishIconUpdate(result.icon);
+    invalidateOnUpdatePage(
+      node.spaceId,
+      node.parentPageId,
+      node.id,
+      node.name,
+      result.icon,
+    );
   };
 
   const handleLoadChildren = async () => {
@@ -162,22 +191,17 @@ export function SpaceTreeRow({
       <div onClick={handleEmojiIconClick} style={{ marginRight: "4px" }}>
         <EmojiPicker
           onEmojiSelect={handleEmojiSelect}
-          icon={
-            node.icon ? (
-              node.icon
-            ) : node.isBase ? (
-              <IconTable size={18} />
-            ) : (
-              <IconFileDescription size="18" />
-            )
-          }
+          icon={<PageIcon icon={node.icon} isBase={node.isBase} />}
           readOnly={!canEdit}
           removeEmojiAction={handleRemoveEmoji}
+          onImageSelect={handleImageSelect}
           actionIconProps={{ tabIndex: -1 }}
         />
       </div>
 
-      <span className={classes.text}>{getPageTitle(node.name, node.isBase, t)}</span>
+      <span className={classes.text}>
+        {getPageTitle(node.name, node.isBase, t)}
+      </span>
 
       <div className={classes.actions}>
         <NodeMenu node={node} canEdit={canEdit} />
@@ -284,7 +308,9 @@ function CreateNode({
       variant="subtle"
       color="gray"
       className={classes.actionIcon}
-      aria-label={t("Create subpage of {{name}}", { name: node.name || t("untitled") })}
+      aria-label={t("Create subpage of {{name}}", {
+        name: node.name || t("untitled"),
+      })}
       tabIndex={-1}
       onClick={(e) => {
         e.preventDefault();

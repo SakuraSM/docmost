@@ -15,6 +15,11 @@ export interface IAttachment {
   deletedAt: string | null;
 }
 
+export interface PageIconUploadResponse {
+  icon: string;
+  attachment: IAttachment;
+}
+
 export interface IPageAttachment extends IAttachment {
   url: string;
   creator: {
@@ -34,5 +39,6 @@ export enum AttachmentType {
   AVATAR = "avatar",
   WORKSPACE_ICON = "workspace-icon",
   SPACE_ICON = "space-icon",
+  PAGE_ICON = "page-icon",
   FILE = "file",
 }

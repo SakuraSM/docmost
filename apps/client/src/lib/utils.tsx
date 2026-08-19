@@ -1,7 +1,7 @@
 import { validate as isValidUUID } from "uuid";
-import { IconFileDescription } from "@tabler/icons-react";
 import { ReactNode } from "react";
 import { TFunction } from "i18next";
+import { PageIcon } from "@/components/common/page-icon.tsx";
 
 export function formatMemberCount(memberCount: number, t: TFunction): string {
   if (memberCount === 1) {
@@ -83,16 +83,12 @@ export function capitalizeFirstChar(string: string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
-export function getPageIcon(icon: string, size = 18): string | ReactNode {
-  return (
-    icon || (
-      <IconFileDescription
-        size={size}
-        color="var(--mantine-color-gray-6)"
-        aria-hidden="true"
-      />
-    )
-  );
+export function getPageIcon(
+  icon?: string | null,
+  size = 18,
+  iconUrl?: string | null,
+): ReactNode {
+  return <PageIcon icon={icon} iconUrl={iconUrl} size={size} />;
 }
 
 export const normalizeUrl = (url: string): string => {

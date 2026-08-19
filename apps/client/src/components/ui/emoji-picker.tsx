@@ -1,13 +1,19 @@
-import React, { ReactNode, useEffect, useState } from "react";
+import React, { ReactNode, useEffect, useRef, useState } from "react";
 import {
   ActionIcon,
   Popover,
   Button,
+  Group,
   useMantineColorScheme,
 } from "@mantine/core";
 import { useClickOutside, useDisclosure, useWindowEvent } from "@mantine/hooks";
 import { Suspense } from "react";
 import { useTranslation } from "react-i18next";
+import { notifications } from "@mantine/notifications";
+import {
+  PAGE_ICON_SOURCE_MAX_BYTES,
+  validatePageIconSource,
+} from "@/features/attachments/services/attachment-service.ts";
 
 // Load the picker module AND the emoji data in parallel inside the lazy
 // resolution, then bind the data into the component. React.lazy only finishes
@@ -26,9 +32,9 @@ const Picker = React.lazy(async () => {
 });
 
 export interface EmojiPickerInterface {
-  onEmojiSelect: (emoji: any) => void;
+  onEmojiSelect: (emoji: any) => void | Promise<void>;
   icon: ReactNode;
-  removeEmojiAction: () => void;
+  removeEmojiAction: () => void | Promise<void>;
   readOnly: boolean;
   actionIconProps?: {
     size?: string;
@@ -36,6 +42,7 @@ export interface EmojiPickerInterface {
     c?: string;
     tabIndex?: number;
   };
+  onImageSelect?: (file: File) => Promise<void>;
 }
 
 function EmojiPicker({
@@ -44,15 +51,23 @@ function EmojiPicker({
   removeEmojiAction,
   readOnly,
   actionIconProps,
+  onImageSelect,
 }: EmojiPickerInterface) {
   const { t } = useTranslation();
   const [opened, handlers] = useDisclosure(false);
   const { colorScheme } = useMantineColorScheme();
   const [target, setTarget] = useState<HTMLElement | null>(null);
   const [dropdown, setDropdown] = useState<HTMLDivElement | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const closeAndRestoreFocus = () => {
+    handlers.close();
+    requestAnimationFrame(() => target?.focus({ preventScroll: true }));
+  };
 
   useClickOutside(
-    () => handlers.close(),
+    closeAndRestoreFocus,
     ["mousedown", "touchstart"],
     [dropdown, target],
   );
@@ -62,7 +77,7 @@ function EmojiPicker({
     if (opened && event.key === "Escape") {
       event.stopPropagation();
       event.preventDefault();
-      handlers.close();
+      closeAndRestoreFocus();
     }
   });
 
@@ -98,20 +113,59 @@ function EmojiPicker({
     };
   }, [opened, dropdown]);
 
-  const handleEmojiSelect = (emoji) => {
-    onEmojiSelect(emoji);
-    handlers.close();
+  const handleEmojiSelect = async (emoji) => {
+    await onEmojiSelect(emoji);
+    closeAndRestoreFocus();
   };
 
-  const handleRemoveEmoji = () => {
-    removeEmojiAction();
-    handlers.close();
+  const handleRemoveEmoji = async () => {
+    await removeEmojiAction();
+    closeAndRestoreFocus();
+  };
+
+  const handleUploadImage = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImageChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !onImageSelect) return;
+
+    try {
+      validatePageIconSource(file);
+    } catch {
+      notifications.show({
+        message:
+          file.size > PAGE_ICON_SOURCE_MAX_BYTES
+            ? t("Image exceeds 10MB limit.")
+            : t("Failed to upload image"),
+        color: "red",
+      });
+      return;
+    }
+
+    setIsUploadingImage(true);
+    try {
+      await onImageSelect(file);
+      closeAndRestoreFocus();
+    } catch (error) {
+      console.error(error);
+      notifications.show({
+        message: t("Failed to upload image"),
+        color: "red",
+      });
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
   return (
     <Popover
       opened={opened}
-      onClose={handlers.close}
+      onClose={closeAndRestoreFocus}
       width={332}
       position="bottom"
       disabled={readOnly}
@@ -124,9 +178,10 @@ function EmojiPicker({
           size={actionIconProps?.size}
           tabIndex={actionIconProps?.tabIndex}
           onClick={handlers.toggle}
-          aria-label={t("Pick emoji")}
+          aria-label={onImageSelect ? t("Choose page icon") : t("Pick emoji")}
           aria-haspopup="dialog"
           aria-expanded={opened}
+          disabled={isUploadingImage}
         >
           {icon}
         </ActionIcon>
@@ -139,20 +194,47 @@ function EmojiPicker({
             skinTonePosition="search"
             theme={colorScheme}
           />
-          <Button
-            variant="default"
-            c="gray"
-            size="xs"
+          {onImageSelect && (
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg"
+              aria-label={t("Upload image")}
+              tabIndex={-1}
+              onChange={handleImageChange}
+              style={{ display: "none" }}
+            />
+          )}
+          <Group
+            gap="xs"
             style={{
               position: "absolute",
               zIndex: 2,
               bottom: "1rem",
               right: "1rem",
             }}
-            onClick={handleRemoveEmoji}
           >
-            {t("Remove")}
-          </Button>
+            {onImageSelect && (
+              <Button
+                variant="default"
+                c="gray"
+                size="xs"
+                loading={isUploadingImage}
+                onClick={handleUploadImage}
+              >
+                {t("Upload image")}
+              </Button>
+            )}
+            <Button
+              variant="default"
+              c="gray"
+              size="xs"
+              disabled={isUploadingImage}
+              onClick={handleRemoveEmoji}
+            >
+              {t("Remove")}
+            </Button>
+          </Group>
         </Popover.Dropdown>
       </Suspense>
     </Popover>

@@ -26,6 +26,13 @@ import { validate as isValidUUID } from 'uuid';
 import { sql } from 'kysely';
 import { TransclusionService } from '../page/transclusion/transclusion.service';
 import { TransclusionLookup } from '../page/transclusion/transclusion.types';
+import { AttachmentType } from '../attachment/attachment.constants';
+import { parsePageIconAttachmentId } from '../attachment/page-icon.utils';
+
+type PublicPageIconSource = {
+  id: string;
+  icon?: string | null;
+};
 
 @Injectable()
 export class ShareService {
@@ -46,8 +53,9 @@ export class ShareService {
       throw new NotFoundException('Share not found');
     }
 
-    const isRestricted =
-      await this.pagePermissionRepo.hasRestrictedAncestor(share.pageId);
+    const isRestricted = await this.pagePermissionRepo.hasRestrictedAncestor(
+      share.pageId,
+    );
     if (isRestricted) {
       throw new NotFoundException('Share not found');
     }
@@ -59,7 +67,10 @@ export class ShareService {
           { includeContent: false },
         );
 
-      return { share, pageTree };
+      return {
+        share,
+        pageTree: await this.addPublicPageIconUrls(pageTree, share.workspaceId),
+      };
     } else {
       return { share, pageTree: [] };
     }
@@ -126,15 +137,20 @@ export class ShareService {
     }
 
     // Block access to restricted pages
-    const isRestricted =
-      await this.pagePermissionRepo.hasRestrictedAncestor(page.id);
+    const isRestricted = await this.pagePermissionRepo.hasRestrictedAncestor(
+      page.id,
+    );
     if (isRestricted) {
       throw new NotFoundException('Shared page not found');
     }
 
     page.content = await this.updatePublicAttachments(page);
 
-    return { page, share };
+    const [publicPage] = await this.addPublicPageIconUrls(
+      [page],
+      page.workspaceId,
+    );
+    return { page: publicPage, share };
   }
 
   async getShareForPage(pageId: string, workspaceId: string) {
@@ -203,6 +219,18 @@ export class ShareService {
       return undefined;
     }
 
+    const [sharedPage] = await this.addPublicPageIconUrls(
+      [
+        {
+          id: share.id,
+          slugId: share.slugId,
+          title: share.title,
+          icon: share.icon,
+        },
+      ],
+      share.workspaceId,
+    );
+
     return {
       id: share.shareId,
       key: share.shareKey,
@@ -214,13 +242,51 @@ export class ShareService {
       workspaceId: share.workspaceId,
       createdAt: share.createdAt,
       level: share.level,
-      sharedPage: {
-        id: share.id,
-        slugId: share.slugId,
-        title: share.title,
-        icon: share.icon,
-      },
+      sharedPage,
     };
+  }
+
+  async addPublicPageIconUrls<T extends PublicPageIconSource>(
+    pages: T[],
+    workspaceId: string,
+  ): Promise<Array<T & { iconUrl?: string }>> {
+    const attachmentIds = pages
+      .map((page) => parsePageIconAttachmentId(page.icon))
+      .filter((attachmentId): attachmentId is string => Boolean(attachmentId));
+
+    if (attachmentIds.length === 0) return pages;
+
+    const attachments = await this.db
+      .selectFrom('attachments')
+      .select(['id', 'pageId', 'fileName'])
+      .where('id', 'in', attachmentIds)
+      .where('workspaceId', '=', workspaceId)
+      .where('type', '=', AttachmentType.PageIcon)
+      .execute();
+    const attachmentById = new Map(
+      attachments.map((attachment) => [attachment.id, attachment]),
+    );
+
+    return Promise.all(
+      pages.map(async (page) => {
+        const attachmentId = parsePageIconAttachmentId(page.icon);
+        if (!attachmentId) return page;
+
+        const attachment = attachmentById.get(attachmentId);
+        if (!attachment || attachment.pageId !== page.id) return page;
+
+        const token = await this.tokenService.generateAttachmentToken({
+          attachmentId,
+          pageId: page.id,
+          workspaceId,
+        });
+        const fileName = encodeURIComponent(attachment.fileName || 'icon');
+        return {
+          ...page,
+          iconUrl: `/api/files/public/${attachmentId}/${fileName}?jwt=${encodeURIComponent(token)}`,
+        };
+      }),
+    );
   }
 
   async getShareAncestorPage(
