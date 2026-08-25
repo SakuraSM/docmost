@@ -62,7 +62,9 @@ All files in the following directories are licensed under the Docmost Enterprise
 
 ### Contributing
 
-Use this fork's [development guide](docs/DEVELOPMENT.md) and
+Start with the repository [agent guide](AGENTS.md) and
+[engineering Harness](docs/harness/README.md), then use this fork's
+[development guide](docs/DEVELOPMENT.md) and
 [architecture overview](ARCHITECTURE.md) as the local source of truth. The
 [upstream Docmost development documentation](https://docmost.com/docs/self-hosting/development)
 remains useful for upstream configuration and deployment context.

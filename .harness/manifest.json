@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "docmost",
+    "root": ".",
+    "baseBranch": "main",
+    "primaryLanguages": ["TypeScript", "TSX", "CSS"]
+  },
+  "toolchain": [
+    {
+      "name": "node",
+      "version": ">=22.13",
+      "source": "docs/DEVELOPMENT.md",
+      "status": "declared"
+    },
+    {
+      "name": "pnpm",
+      "version": "11.15.1",
+      "source": "package.json#packageManager",
+      "status": "observed"
+    },
+    {
+      "name": "postgresql",
+      "version": ">=16",
+      "source": "docs/DEVELOPMENT.md",
+      "status": "declared"
+    },
+    {
+      "name": "redis-or-valkey",
+      "version": ">=7",
+      "source": "docs/DEVELOPMENT.md",
+      "status": "declared"
+    }
+  ],
+  "commands": {
+    "bootstrap": {
+      "command": "pnpm install --frozen-lockfile",
+      "cwd": ".",
+      "source": ".github/workflows/ci.yml",
+      "status": "observed"
+    },
+    "development": {
+      "command": "pnpm dev",
+      "cwd": ".",
+      "source": "package.json#scripts.dev",
+      "status": "declared"
+    },
+    "testClient": {
+      "command": "pnpm test",
+      "cwd": "apps/client",
+      "source": ".github/workflows/ci.yml",
+      "status": "observed"
+    },
+    "testServer": {
+      "command": "pnpm test",
+      "cwd": "apps/server",
+      "source": "apps/server/package.json#scripts.test",
+      "status": "declared"
+    },
+    "build": {
+      "command": "pnpm build",
+      "cwd": ".",
+      "source": ".github/workflows/ci.yml",
+      "status": "observed"
+    },
+    "dockerBuild": {
+      "command": "docker build -t docmost-local .",
+      "cwd": ".",
+      "source": "docs/DEVELOPMENT.md",
+      "status": "observed"
+    },
+    "migrationLatest": {
+      "command": "pnpm migration:latest",
+      "cwd": "apps/server",
+      "source": "apps/server/package.json#scripts.migration:latest",
+      "status": "declared"
+    }
+  },
+  "boundaries": {
+    "noTouch": [
+      "apps/client/src/ee",
+      "apps/server/src/ee",
+      "packages/ee"
+    ],
+    "generated": [
+      "apps/server/src/database/types/db.d.ts",
+      "apps/*/dist",
+      "packages/*/dist",
+      "coverage",
+      ".nx",
+      "node_modules"
+    ],
+    "externalConsumers": [
+      "HTTP API under /api",
+      "public share routes",
+      "Socket.IO and collaboration clients",
+      "Docmost ZIP imports and exports",
+      "local, S3-compatible, and Azure attachment storage",
+      "Docker Compose and GHCR release consumers"
+    ]
+  },
+  "riskDomains": [
+    "authentication and sessions",
+    "authorization and workspace isolation",
+    "public sharing and signed files",
+    "attachments and lifecycle cleanup",
+    "imports and exports",
+    "database migrations",
+    "collaboration and WebSocket invalidation",
+    "CI, containers, and releases",
+    "enterprise-license boundary"
+  ],
+  "knowledge": {
+    "root": "docs/project-knowledge",
+    "entries": ["README.md", "dev-map.md", "contexts.md", "flows.md"]
+  },
+  "harness": {
+    "tier": "standard",
+    "docsRoot": "docs/harness",
+    "instructionEntry": "AGENTS.md",
+    "generatedAt": "2026-08-25",
+    "sourceCommit": "11d35ca49fbc8dd216adc2ffb5dc5b2778cbba68"
+  }
+}
