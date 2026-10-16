@@ -16,7 +16,7 @@ operating rules live under `docs/harness/`; stable system facts live under
 
 ## Toolchain and commands
 
-Use Node.js 22.13 or newer and pnpm `11.15.1`, as documented in
+Use Node.js 22.13 or newer and pnpm `11.28.2`, as documented in
 `docs/DEVELOPMENT.md` and pinned in `package.json`. Prefer the lockfile-safe
 bootstrap used by CI.
 

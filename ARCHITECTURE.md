@@ -50,7 +50,23 @@ BullMQ workers handle attachment indexing and cleanup, imports and exports,
 notifications, and other deferred work. Jobs must be retry-safe because Redis
 delivery is at least once.
 
-## Boundaries
+## Upstream 0.96 additions
+
+Public spaces expose published documentation under `/docs/` and reuse the
+shared docs navigation surface. Public-space page, tree, and search responses
+derive signed page-image icon URLs through `ShareService`.
+
+The editor includes presentation mode and nested tabs. Shared editor extensions
+define the persisted document schema, so changes must retain import/export and
+collaboration compatibility.
+
+External integrations live in `apps/server/src/core/integration` and
+`apps/client/src/features/integration`. They use server-provided entitlements,
+OAuth connections, queued credential refresh, and outbound network validation.
+This fork preserves the existing enterprise directories; newer enterprise-only
+consent/template screens are outside this synchronization.
+
+## License boundary
 
 Open-source code is under the AGPL-3.0 license. Files in `apps/client/src/ee`,
 `apps/server/src/ee`, and `packages/ee` are enterprise-licensed and are not part

@@ -2,7 +2,7 @@ FROM node:26-slim AS base
 ARG SOURCE_REPOSITORY=https://github.com/SakuraSM/docmost
 LABEL org.opencontainers.image.source="${SOURCE_REPOSITORY}"
 
-RUN npm install -g pnpm@11.15.1
+RUN npm install -g pnpm@11.28.2
 
 FROM base AS builder
 
@@ -15,11 +15,25 @@ RUN pnpm build
 
 FROM base AS installer
 
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends curl bash \
+  && rm -rf /var/lib/apt/lists/*
+
+# drop npm and corepack
+RUN rm -rf /usr/local/lib/node_modules/npm \
+  && rm -rf /usr/local/lib/node_modules/corepack \
+  && rm -rf /usr/local/bin/npm \
+  && rm -rf /usr/local/bin/npx \
+  && rm -rf /usr/local/bin/corepack \
+  && rm -rf /root/.npm \
+  && rm -rf /root/.node-gyp
+
 WORKDIR /app
 
 # Copy apps
 COPY --from=builder /app/apps/server/dist /app/apps/server/dist
 COPY --from=builder /app/apps/client/dist /app/apps/client/dist
+COPY --from=builder /app/apps/client/package.json /app/apps/client/package.json
 COPY --from=builder /app/apps/server/package.json /app/apps/server/package.json
 
 # Copy packages
@@ -39,7 +53,8 @@ RUN chown -R node:node /app
 
 USER node
 
-RUN pnpm install --frozen-lockfile --prod && rm -rf /home/node/.cache/pnpm
+# client package.json is only copied for the lockfile check; its deps are bundled in dist
+RUN pnpm install --frozen-lockfile --prod --filter '!./apps/client' && rm -rf /home/node/.cache/pnpm
 
 RUN mkdir -p /app/data/storage
 
