@@ -16,6 +16,32 @@ credentials, temporary debugging logs, or task-by-task noise.
 | Date | Change | Behavior impact | Verification | Knowledge update | Follow-up |
 | --- | --- | --- | --- | --- | --- |
 | 2026-08-25 | Added Standard repository Harness | documentation only | Harness validator, links, command declarations, and diff whitespace passed | initial project maps and flows added | review priority gaps |
+| 2026-10-16 | Sync upstream through `6852e042` | upstream 0.96 features and fixes; adapted fork image icons to new public docs/subpage surfaces | client 442/442; focused server 97/97; four-project build passed; Docker blocked by Debian network 502; server full suite and lint limitations recorded below | architecture and pnpm 11.28.2 commands updated | migrations and browser verification require a disposable runtime |
+
+## 2026-10-16 synchronization evidence
+
+- Source range: `cd9c1669..6852e042`, 68 upstream commits.
+- All three enterprise directory trees remain identical to pre-sync `main`.
+  New OSS consumers retain server entitlement checks; enterprise consent and
+  template additions that require new EE files are excluded.
+- Fork image-icon upload, attachment/history cleanup, copy/import/export, CI,
+  release tag conventions, and Compose image remain present.
+- Node 22.23.1 with pnpm 11.28.2: frozen installation passed.
+- Client: 31 suites, 442 tests passed.
+- Focused server: page icon, public space, search, collaboration gateway, and
+  client-IP specs passed (5 suites, 97 tests).
+- Full build: all four Nx projects passed.
+- Full server run: 53 suites passed, 15 failed; 889 tests passed, 14 failed.
+  Failures involve test dependency injection and missing constructor mocks.
+  The WorkspaceService constructor mismatch is unchanged from upstream
+  `6852e042`; do not describe the entire suite as green.
+- Client lint cannot load the installed TanStack Query ESLint plugin entrypoint.
+- Docker build attempted twice; both failed at the upstream Debian apt step
+  with HTTP 502. HTTPS access also failed. No successful image is claimed.
+- Browser interaction and migration up/down checks were not run: this sync did
+  not provision an isolated database/application environment.
+- No PR, push, merge to main, release, or remote deployment is part of this
+  local synchronization commit.
 
 ## Feedback loop
 

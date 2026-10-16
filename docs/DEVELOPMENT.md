@@ -6,7 +6,7 @@ configuration guidance remains available in the [Docmost documentation](https://
 ## Prerequisites
 
 - Node.js 22.13 or newer
-- pnpm 11.15.1, as pinned by `packageManager`
+- pnpm 11.28.2, as pinned by `packageManager`
 - PostgreSQL 16 or newer
 - Redis or Valkey 7 or newer
 - Docker, when validating the production image

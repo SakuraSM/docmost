@@ -7,6 +7,7 @@ import { AuditActorInterceptor } from './common/interceptors/audit-actor.interce
 import { CoreModule } from './core/core.module';
 import { EnvironmentModule } from './integrations/environment/environment.module';
 import { CollaborationModule } from './collaboration/collaboration.module';
+import { CollabAccessModule } from './collaboration/collab-access.module';
 import { WsModule } from './ws/ws.module';
 import { DatabaseModule } from '@docmost/db/database.module';
 import { StorageModule } from './integrations/storage/storage.module';
@@ -28,6 +29,7 @@ import { LoggerModule } from './common/logger/logger.module';
 import { ClsModule } from 'nestjs-cls';
 import { NoopAuditModule } from './integrations/audit/audit.module';
 import { ThrottleModule } from './integrations/throttle/throttle.module';
+import { OutboundModule } from './integrations/outbound/outbound.module';
 import { EncryptionModule } from './integrations/encryption/encryption.module';
 
 const enterpriseModules = [];
@@ -51,7 +53,7 @@ try {
       middleware: { mount: true },
     }),
     LoggerModule,
-    NoopAuditModule,
+    ...(enterpriseModules.length > 0 ? [] : [NoopAuditModule]),
     CoreModule,
     DatabaseModule,
     EnvironmentModule,
@@ -82,6 +84,7 @@ try {
       inject: [EnvironmentService],
     }),
     CollaborationModule,
+    CollabAccessModule,
     WsModule,
     QueueModule,
     StaticModule,
@@ -98,6 +101,7 @@ try {
     SecurityModule,
     TelemetryModule,
     ThrottleModule,
+    OutboundModule,
     ...enterpriseModules,
   ],
   controllers: [AppController],

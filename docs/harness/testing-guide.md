@@ -25,8 +25,8 @@ and must not be used as a read-only verification step without explicit intent.
 
 | Changed area | Focused check | Additional evidence |
 | --- | --- | --- |
-| Client utility/component | `pnpm --filter ./apps/client test -- src/features/page/page-icon.utils.test.ts` with the nearest real test path | render, keyboard/focus, loading/error state, light/dark, narrow layout |
-| Server service/controller | `pnpm --filter ./apps/server test -- page-icon.utils.spec.ts --runInBand` with the nearest real spec name | success, invalid input, unauthenticated, forbidden, cross-workspace, cleanup |
+| Client utility/component | `pnpm --filter ./apps/client exec vitest run src/features/page/page-icon.utils.test.ts` with the nearest real test path | render, keyboard/focus, loading/error state, light/dark, narrow layout |
+| Server service/controller | `pnpm --filter ./apps/server exec jest --runInBand page-icon.utils.spec.ts` with the nearest real spec name | success, invalid input, unauthenticated, forbidden, cross-workspace, cleanup |
 | Editor extension | `pnpm editor-ext:build` | consumer client build and editor round-trip |
 | Formula package | `pnpm nx run @docmost/base-formula:build` | parser/evaluator examples or benchmark when performance changes |
 | Database migration | migration up, down/recovery, and latest on a disposable database; then `pnpm --filter ./apps/server migration:codegen` | schema diff, data preservation, regenerated types |
